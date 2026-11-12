@@ -26,7 +26,7 @@ RTT ~ 100 ms and `--loss p` gives round-trip loss 1-(1-p)^2.
 4. Wireshark: capture on the loopback adapter, filter `udp.port == 5005 || udp.port == 5006`;
    100 datagrams visible, first 4 payload bytes = sequence number.
 
-## Known limitations (state these in the report)
+## Known limitations
 * Windows timer resolution is ~1-15 ms, so delays below ~15 ms are approximate.
 * The proxy is Python: it will not sustain very high packet rates, so measure
   a no-delay run first and only trust results below that ceiling.
