@@ -10,16 +10,17 @@ Run (from the repo root, e.g. in PowerShell):
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import logging
 import os
+import posixpath
 import selectors
 import socket
 import struct
 import sys
 import threading
 import time
-import posixpath
 from collections import Counter
 from dataclasses import dataclass
 
@@ -41,6 +42,9 @@ SYN_FMT = "!QH32sH"
 SYN_FIXED = struct.calcsize(SYN_FMT)  # 44
 
 RECEIVING, LINGER = "RECEIVING", "LINGER"
+
+CSV_FIELDS = ["time", "client", "transfer_id", "file", "status", "bytes", "chunks",
+              "duplicates", "out_of_order", "bad_length", "seconds", "corrupt_dropped_total"]
 
 
 def parse_syn_payload(payload: bytes):
@@ -106,7 +110,8 @@ class Session:
 
 class Server:
     def __init__(self, host="127.0.0.1", port=DEFAULT_PORT, outdir="received",
-                 linger=LINGER_S, inactivity=INACTIVITY_S):
+                 linger=LINGER_S, inactivity=INACTIVITY_S, stats_csv=None):
+        self.stats_csv = stats_csv          # optional per-session CSV for experiments
         self.outdir = outdir
         self.linger = linger
         self.inactivity = inactivity
@@ -275,7 +280,7 @@ class Server:
         else:
             os.replace(s.part_path, s.part_path[:-5] + ".bad")
         s.status, s.state, s.linger_until = status, LINGER, now + self.linger
-        self.finished.append(self._summary(s, status))
+        self._record(self._summary(s, status))
         log.info("FIN  %s tid=%08x status=%d dup=%d ooo=%d", addr, tid, status,
                  s.duplicates, s.out_of_order)
         self._send(addr, P.FIN_ACK, tid, s.total_chunks, bytes([status]))
@@ -287,6 +292,35 @@ class Server:
                 "out_of_order": s.out_of_order, "bad_len": s.bad_len,
                 "seconds": time.monotonic() - s.started}
 
+    def _record(self, summary: dict):
+        """Keep the summary in memory and, if --stats-csv is set, append a CSV row."""
+        self.finished.append(summary)
+        if not self.stats_csv:
+            return
+        row = {
+            "time": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "client": f"{summary['addr'][0]}:{summary['addr'][1]}",
+            "transfer_id": f"{summary['tid']:08x}",
+            "file": summary["name"],
+            "status": summary["status"],
+            "bytes": summary["bytes"],
+            "chunks": summary["chunks"],
+            "duplicates": summary["duplicates"],
+            "out_of_order": summary["out_of_order"],
+            "bad_length": summary["bad_len"],
+            "seconds": f"{summary['seconds']:.3f}",
+            "corrupt_dropped_total": self.stats["corrupt_dropped"],
+        }
+        try:
+            new = not os.path.exists(self.stats_csv) or os.path.getsize(self.stats_csv) == 0
+            with open(self.stats_csv, "a", newline="", encoding="utf-8") as f:
+                w = csv.DictWriter(f, fieldnames=CSV_FIELDS)
+                if new:
+                    w.writeheader()
+                w.writerow(row)
+        except OSError:
+            log.warning("cannot write stats CSV %s", self.stats_csv)
+
     def _abort(self, s: Session, reason: str):
         try:
             if not s.fh.closed:
@@ -296,7 +330,7 @@ class Server:
         except OSError:
             pass
         if s.state == RECEIVING:
-            self.finished.append(self._summary(s, "ABORTED: " + reason))
+            self._record(self._summary(s, "ABORTED: " + reason))
             log.warning("ABORT %s tid=%08x: %s", s.addr, s.tid, reason)
         self.sessions.pop((s.addr, s.tid), None)
 
@@ -315,11 +349,12 @@ def main(argv=None):
     ap.add_argument("--outdir", default="received")
     ap.add_argument("--linger", type=float, default=LINGER_S)
     ap.add_argument("--inactivity", type=float, default=INACTIVITY_S)
+    ap.add_argument("--stats-csv", default=None, help="append one row per finished session")
     ap.add_argument("-v", "--verbose", action="store_true")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if a.verbose else logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
-    srv = Server(a.host, a.port, a.outdir, a.linger, a.inactivity)
+    srv = Server(a.host, a.port, a.outdir, a.linger, a.inactivity, a.stats_csv)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
