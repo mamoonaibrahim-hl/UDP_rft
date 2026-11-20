@@ -1,0 +1,4 @@
+time,client,transfer_id,file,status,bytes,chunks,duplicates,out_of_order,bad_length,seconds,corrupt_dropped_total
+2026-11-20T20:04:40,127.0.0.1:58535,def87859,src_1048576.bin,0,1048576,1024,0,0,0,224.370,0
+2026-11-20T20:08:21,127.0.0.1:60261,b5861a6e,src_1048576.bin,0,1048576,1024,0,0,0,220.515,0
+2026-11-20T20:12:08,127.0.0.1:53675,7b7f2785,src_1048576.bin,0,1048576,1024,0,0,0,226.489,0

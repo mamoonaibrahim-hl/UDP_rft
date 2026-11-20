@@ -1,0 +1,10 @@
+scenario,mode,window,delay_ms,loss_pct,duplicate_pct,corrupt_pct,reorder_pct,rate_mbps,file_size,rep,completion_s,goodput_mbps,retransmissions,retrans_ratio_pct,server_duplicates,server_out_of_order,server_corrupt_dropped,hash_ok,status,probe_rtt_ms,pcap_retransmissions,pcap_match,wall_s,timestamp
+calibrate,stop-and-wait,1,0,0,0,0,0,0,10485760,1,5.341,15.705,0,0.0,0,0,0,True,OK,1.26,,,5.93,2026-11-20T19:36:25
+calibrate,stop-and-wait,1,0,0,0,0,0,0,10485760,2,6.949,12.072,0,0.0,0,0,0,True,OK,1.26,,,7.38,2026-11-20T19:36:32
+calibrate,stop-and-wait,1,0,0,0,0,0,0,10485760,3,8.447,9.931,0,0.0,0,0,0,True,OK,1.26,,,8.95,2026-11-20T19:36:41
+calibrate,sliding,32,0,0,0,0,0,0,10485760,1,1.118,75.0,0,0.0,0,0,0,True,OK,1.17,,,1.58,2026-11-20T19:36:45
+calibrate,sliding,32,0,0,0,0,0,0,10485760,2,1.331,63.014,0,0.0,0,0,0,True,OK,1.17,,,1.72,2026-11-20T19:36:47
+calibrate,sliding,32,0,0,0,0,0,0,10485760,3,1.265,66.306,0,0.0,0,0,0,True,OK,1.17,,,1.72,2026-11-20T19:36:49
+calibrate,sliding,128,0,0,0,0,0,0,10485760,1,3.488,24.049,1024,9.09,0,917,0,True,OK,0.99,,,3.9,2026-11-20T19:36:56
+calibrate,sliding,128,0,0,0,0,0,0,10485760,2,1.185,70.792,128,1.23,0,65,0,True,OK,0.99,,,1.77,2026-11-20T19:36:58
+calibrate,sliding,128,0,0,0,0,0,0,10485760,3,0.518,162.05,0,0.0,0,0,0,True,OK,0.99,,,1.06,2026-11-20T19:36:59
