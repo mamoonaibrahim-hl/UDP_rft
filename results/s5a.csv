@@ -1,0 +1,4 @@
+scenario,rep,file_size,delay_ms,window,baseline_s,outage_start_s,outage_len_s,completion_s,last_ack_before_s,first_ack_after_s,recovery_s,recovery_ok_4s,retransmissions,hash_ok,status,timestamp
+s5a,1,1048576,50,32,4.274,2.137,5.0,11.86,2.16792,9.845496,2.708,True,160.0,True,OK,2026-11-27T22:47:10
+s5a,2,1048576,50,32,4.274,2.137,5.0,11.884,2.149122,9.833596,2.697,True,160.0,True,OK,2026-11-27T22:47:23
+s5a,3,1048576,50,32,4.274,2.137,5.0,11.876,2.154828,9.829587,2.693,True,160.0,True,OK,2026-11-27T22:47:35

@@ -64,10 +64,10 @@ def make_file(tmp_path):
 
 @pytest.fixture
 def run_client(tmp_path):
-    def run(path, port, window=1, timeout=180):
+    def run(path, port, window=1, timeout=180, extra=()):
         log = tmp_path / f"client_{os.path.basename(str(path))}.csv"
         cmd = [sys.executable, "-m", "rft.client", str(path), "--host", "127.0.0.1",
-               "--port", str(port), "--window", str(window), "--log", str(log)]
+               "--port", str(port), "--window", str(window), "--log", str(log), *extra]
         return subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=timeout)
     return run
 

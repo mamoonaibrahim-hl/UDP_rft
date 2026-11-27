@@ -46,6 +46,11 @@ class TransferError(Exception):
 
 
 class Client:
+    selective = False        # E1: the SelectiveClient subclass sets this to True
+
+    def syn_options(self):
+        return b""          # E1: extra bytes after the file name in the SYN
+
     def __init__(
         self, sock, transfer_id, file_size, writer, window=1
     ):
@@ -168,9 +173,11 @@ class Client:
             ):
                 continue
 
-            if expected_type in (P.SYN_ACK, P.ACK):
-                if packet.payload:
-                    continue
+            if expected_type == P.SYN_ACK and packet.payload:
+                continue
+
+            if expected_type == P.ACK and packet.payload and not self.selective:
+                continue
 
             if expected_type == P.FIN_ACK:
                 if (
@@ -351,7 +358,7 @@ class Client:
             chunk_size,
             digest,
             len(name_bytes),
-        ) + name_bytes
+        ) + name_bytes + self.syn_options()
 
         print(
             f"Starting transfer with window {self.window}...",
@@ -445,6 +452,11 @@ def main():
         default=1024,
     )
     parser.add_argument("--log", type=Path, default=None)
+    parser.add_argument(
+        "--selective",
+        action="store_true",
+        help="selective retransmission (extension E1)",
+    )
 
     args = parser.parse_args()
 
@@ -535,7 +547,14 @@ def main():
                             # connection resets if this option fails.
                             pass
 
-                    client = Client(
+                    if args.selective:
+                        from rft.selective import SelectiveClient
+
+                        client_class = SelectiveClient
+                    else:
+                        client_class = Client
+
+                    client = client_class(
                         sock,
                         transfer_id,
                         file_size,
