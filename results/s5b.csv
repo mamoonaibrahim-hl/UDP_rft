@@ -1,0 +1,4 @@
+scenario,rep,file_size,delay_ms,window,killed_at_s,abort_after_kill_s,abort_after_last_ack_s,within_30s,exit_code,error_text,status,timestamp
+s5b,1,1048576,50,32,2.147,22.58,22.83,True,1,Transfer failed: ten consecutive DATA timeouts,OK,2026-11-27T22:49:54
+s5b,2,1048576,50,32,2.147,22.6,22.86,True,1,Transfer failed: ten consecutive DATA timeouts,OK,2026-11-27T22:50:19
+s5b,3,1048576,50,32,2.147,22.63,22.81,True,1,Transfer failed: ten consecutive DATA timeouts,OK,2026-11-27T22:50:44

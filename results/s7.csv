@@ -1,0 +1,10 @@
+scenario,rep,run,client,file_size,delay_ms,window,completion_s,goodput_mbps,retransmissions,hash_ok,slowdown_vs_single,status,timestamp
+s7,1,single,A,1048576,50,32,4.119,2.037,0.0,True,,OK,2026-11-27T22:50:52
+s7,1,concurrent,A,1048576,50,32,4.328,1.938,0.0,True,1.05,OK,2026-11-27T22:50:57
+s7,1,concurrent,B,1048576,50,32,4.319,1.942,0.0,True,1.05,OK,2026-11-27T22:50:57
+s7,2,single,A,1048576,50,32,4.321,1.941,0.0,True,,OK,2026-11-27T22:51:02
+s7,2,concurrent,A,1048576,50,32,4.319,1.942,0.0,True,1.0,OK,2026-11-27T22:51:07
+s7,2,concurrent,B,1048576,50,32,4.311,1.946,0.0,True,1.0,OK,2026-11-27T22:51:07
+s7,3,single,A,1048576,50,32,4.278,1.961,0.0,True,,OK,2026-11-27T22:51:12
+s7,3,concurrent,A,1048576,50,32,4.27,1.965,0.0,True,1.0,OK,2026-11-27T22:51:16
+s7,3,concurrent,B,1048576,50,32,4.321,1.941,0.0,True,1.01,OK,2026-11-27T22:51:16

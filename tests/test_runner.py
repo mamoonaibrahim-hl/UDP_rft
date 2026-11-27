@@ -106,3 +106,46 @@ def test_merge_combines_csv_files(tmp_path):
                 w.writerow({k: "x" for k in rx.FIELDS})
     rx.merge_results(tmp_path)
     assert len(rows(tmp_path / "all_results.csv")) == 5
+
+
+# ---- Week 5 additions --------------------------------------------------------------------
+def test_extension_scenarios_are_defined():
+    s8 = rx.scenario_configs("s8")
+    assert {c.mode for c in s8} == {"sliding", "selective"} and all(c.window == 32 for c in s8)
+    assert any(c.loss_pct == 5 for c in s8) and any(c.reorder_pct == 25 for c in s8)
+    s8b = rx.scenario_configs("s8b")
+    assert {c.mode for c in s8b} == {"sliding", "adaptive"} and all(c.jitter_ms == 40 for c in s8b)
+
+
+def test_resume_treats_missing_jitter_column_as_zero(tmp_path):
+    path = tmp_path / "old.csv"
+    path.write_text("scenario,mode,window,delay_ms,loss_pct,duplicate_pct,corrupt_pct,reorder_pct,"
+                    "rate_mbps,file_size,rep\ns2,sliding,32,50,0,0,0,0,0,1048576,1\n")
+    done = rx.load_done_keys(str(path))
+    cfg = rx.Config("s2", 32, delay_ms=50, file_size=1048576)
+    assert rx.key_of(cfg, 1) in done
+
+
+def test_s7_two_clients_both_verified(tmp_path):
+    r = run(["--scenario", "s7", "--quick", "--results-dir", str(tmp_path)])
+    assert r.returncode == 0, r.stdout + r.stderr
+    data = rows(tmp_path / "s7.csv")
+    assert [d["run"] for d in data] == ["single", "concurrent", "concurrent"]
+    assert all(d["hash_ok"] == "True" and d["status"] == "OK" for d in data)
+
+
+def test_s5a_outage_is_survived_and_recovery_is_measured(tmp_path):
+    r = run(["--scenario", "s5a", "--quick", "--results-dir", str(tmp_path)])
+    assert r.returncode == 0, r.stdout + r.stderr
+    d = rows(tmp_path / "s5a.csv")[0]
+    assert d["hash_ok"] == "True" and d["status"] == "OK"
+    assert float(d["completion_s"]) >= 2.0                 # it really stalled for the 2 s outage
+    assert d["recovery_s"] != "" and float(d["recovery_s"]) <= 4.0
+
+
+@pytest.mark.skipif(not os.environ.get("RUN_SLOW"), reason="set RUN_SLOW=1 (takes about 30 s)")
+def test_s5b_client_gives_up_when_server_is_killed(tmp_path):
+    r = run(["--scenario", "s5b", "--quick", "--results-dir", str(tmp_path)], timeout=180)
+    assert r.returncode == 0, r.stdout + r.stderr
+    d = rows(tmp_path / "s5b.csv")[0]
+    assert d["exit_code"] == "1" and d["within_30s"] == "True" and d["status"] == "OK"

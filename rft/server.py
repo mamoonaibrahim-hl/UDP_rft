@@ -22,9 +22,10 @@ import sys
 import threading
 import time
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from . import packet as P
+from .sack import SACK_RANGE, make_sack
 
 log = logging.getLogger("rft.server")
 
@@ -56,6 +57,17 @@ def parse_syn_payload(payload: bytes):
     if len(raw) != nlen:
         raise ValueError("file name truncated")
     return size, chunk, sha, raw.decode("utf-8")
+
+
+def parse_syn_options(payload: bytes) -> int:
+    """Optional byte after the file name. Bit 0 = the client wants selective ACKs (extension E1)."""
+    if len(payload) < SYN_FIXED:
+        return 0
+    name_length = struct.unpack_from("!H", payload, SYN_FIXED - 2)[0]
+    position = SYN_FIXED + name_length
+    if len(payload) > position:
+        return payload[position]
+    return 0
 
 
 def safe_name(name: str) -> str:
@@ -101,6 +113,8 @@ class Session:
     out_of_order: int = 0
     bad_len: int = 0
     early_fin: int = 0
+    selective: bool = False                       # extension E1: buffer out-of-order chunks
+    buffer: dict = field(default_factory=dict)    # chunk number -> payload waiting for its turn
 
     def expected_len(self, seq: int) -> int:
         if seq < self.total_chunks - 1:
@@ -217,9 +231,11 @@ class Server:
             self._error(addr, tid, ERR_IO, "cannot create file")
             return
         total = (size + chunk - 1) // chunk
-        self.sessions[(addr, tid)] = Session(
+        new_session = Session(
             addr, tid, name, size, chunk, sha, total, part, final, fh,
             hashlib.sha256(), started=now, last_activity=now)
+        new_session.selective = bool(parse_syn_options(payload) & 1)
+        self.sessions[(addr, tid)] = new_session
         log.info("SYN  %s tid=%08x name=%s size=%d chunks=%d", addr, tid, name, size, total)
         self._send(addr, P.SYN_ACK, tid)
 
@@ -234,6 +250,9 @@ class Server:
         if s.state != RECEIVING:               # already complete: just re-ACK
             s.duplicates += 1
             self._send(addr, P.ACK, tid, s.expected)
+            return
+        if s.selective:
+            self._data_selective(s, addr, tid, seq, payload)
             return
         if seq == s.expected:
             if seq >= s.total_chunks or len(payload) != s.expected_len(seq):
@@ -253,6 +272,39 @@ class Server:
         else:
             s.out_of_order += 1                # discard (go-back-N receiver)
         self._send(addr, P.ACK, tid, s.expected)
+
+    def _write_chunk(self, s, payload):
+        """Write one in-order chunk (selective sessions). Returns False if the disk failed."""
+        try:
+            s.fh.write(payload)
+        except OSError:
+            return False
+        s.hasher.update(payload)
+        s.written += len(payload)
+        s.expected += 1
+        return True
+
+    def _data_selective(self, s, addr, tid, seq, payload):
+        """Extension E1: keep chunks that arrive early and tell the sender which ones we hold."""
+        if seq < s.expected or seq in s.buffer:
+            s.duplicates += 1
+        elif seq >= s.total_chunks or seq >= s.expected + SACK_RANGE:
+            s.out_of_order += 1                       # too far ahead: ignore it
+        elif len(payload) != s.expected_len(seq):
+            s.bad_len += 1
+            return                                    # wrong length: drop, no ACK
+        elif seq == s.expected:
+            ok = self._write_chunk(s, payload)
+            while ok and s.expected in s.buffer:      # now the buffered chunks can follow
+                ok = self._write_chunk(s, s.buffer.pop(s.expected))
+            if not ok:
+                self._error(addr, tid, ERR_IO, "disk write failed")
+                self._abort(s, "disk write failed")
+                return
+        else:
+            s.buffer[seq] = payload
+            s.out_of_order += 1
+        self._send(addr, P.ACK, tid, s.expected, make_sack(s.expected, s.buffer))
 
     # ------------------------------------------------------------------- FIN
     def _on_fin(self, addr, tid, seq, now):
