@@ -1,0 +1,1 @@
+proxy 127.0.0.1:50593 -> 127.0.0.1:50592  delay=50.0ms loss=0% dup=0% corrupt=0% reorder=0% rate=10.0Mbps outage=None
