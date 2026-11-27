@@ -299,7 +299,163 @@ def plot_lines(summary, x, metric, title, xlabel, ylabel, name, folder):
     )
 
     save_figure(fig, folder, name)
+def plot_s4(results_folder, output_folder):
+    """Summarise S4 and compare measured goodput with an ideal rate."""
+    data = load_results(results_folder, "s4")
 
+    windows = [1, 2, 4, 8, 16, 32, 64, 128]
+
+    expected_settings = {
+        "file_size": 1048576,
+        "delay_ms": 50,
+        "duplicate_pct": 0,
+        "corrupt_pct": 0,
+        "reorder_pct": 0,
+        "rate_mbps": 10,
+    }
+
+    for column, expected in expected_settings.items():
+        if not data[column].eq(expected).all():
+            raise ValueError(f"S4: unexpected {column}")
+
+    if set(data["loss_pct"]) != {0, 2}:
+        raise ValueError("S4: expected 0% and 2% loss")
+
+    for loss in (0, 2):
+        part = data.loc[data["loss_pct"].eq(loss)]
+
+        if set(part["window"]) != set(windows):
+            raise ValueError(f"S4: missing window sizes at {loss}% loss")
+
+        for window in windows:
+            runs = part.loc[part["window"].eq(window)]
+
+            if len(runs) != 3 or set(runs["rep"]) != {1, 2, 3}:
+                raise ValueError(
+                    f"S4: expected repetitions 1, 2, 3 "
+                    f"for W={window}, loss={loss}%"
+                )
+
+    if not data["probe_rtt_ms"].gt(0).all():
+        raise ValueError("S4: measured RTT must be positive")
+
+    # Ideal reference: min(W * payload bits / measured RTT, link rate).
+    # Chunk size is 1024 bytes in these experiments.
+    data["ideal_goodput_mbps"] = np.minimum(
+        data["window"] * 1024 * 8
+        / (data["probe_rtt_ms"] / 1000)
+        / 1_000_000,
+        data["rate_mbps"],
+    )
+
+    summary = make_summary(data)
+
+    ideal = (
+        data.groupby(CONFIG, dropna=False)["ideal_goodput_mbps"]
+        .mean()
+        .rename("ideal_goodput_mbps_mean")
+        .reset_index()
+    )
+
+    summary = summary.merge(
+        ideal,
+        on=CONFIG,
+        validate="one_to_one",
+    )
+
+    summary.to_csv(
+        output_folder / "s4_summary.csv",
+        index=False,
+    )
+
+    charts = [
+        (
+            "goodput_mbps",
+            "Goodput (Mbps)",
+            "S4: Goodput versus window size",
+            "s4_goodput_vs_window",
+        ),
+        (
+            "retrans_ratio_pct",
+            "DATA retransmission ratio (%)",
+            "S4: Retransmissions versus window size",
+            "s4_retransmissions_vs_window",
+        ),
+    ]
+
+    for metric, ylabel, title, filename in charts:
+        fig, ax = plt.subplots(
+            figsize=(9, 5.5),
+            layout="constrained",
+        )
+
+        for loss, color in ((0, "#2563eb"), (2, "#d97706")):
+            part = summary.loc[
+                summary["loss_pct"].eq(loss)
+            ].sort_values("window")
+
+            ax.errorbar(
+                part["window"].to_numpy(),
+                part[f"{metric}_mean"].to_numpy(),
+                yerr=part[f"{metric}_std"].to_numpy(),
+                marker="o",
+                capsize=4,
+                color=color,
+                label=f"{loss}% loss per direction",
+            )
+
+        if metric == "goodput_mbps":
+            reference = summary.loc[
+                summary["loss_pct"].eq(0)
+            ].sort_values("window")
+
+            ax.plot(
+                reference["window"].to_numpy(),
+                reference["ideal_goodput_mbps_mean"].to_numpy(),
+                "--",
+                color="#374151",
+                label="Ideal no-loss reference using measured probe RTT",
+            )
+
+            ax.axhline(
+                10,
+                color="#6b7280",
+                linestyle=":",
+                label="Configured rate limit: 10 Mbps",
+            )
+
+        ax.set_xscale("log", base=2)
+        ax.set_xticks(windows)
+        ax.set_xticklabels([str(w) for w in windows])
+        ax.set_ylim(bottom=0)
+        ax.set_xlabel("Sender window size (chunks)")
+        ax.set_ylabel(ylabel)
+        ax.set_title(title)
+        ax.grid(alpha=0.25)
+        ax.legend(fontsize=9)
+
+        fig.supxlabel(
+            "1 MiB file; 50 ms configured one-way delay; "
+            "mean ± sample SD from 3 runs.",
+            fontsize=9,
+        )
+
+        save_figure(fig, output_folder, filename)
+
+    print("\nS4 summary:")
+    print(
+        summary[
+            [
+                "window",
+                "loss_pct",
+                "runs",
+                "goodput_mbps_mean",
+                "goodput_mbps_std",
+                "retrans_ratio_pct_mean",
+                "probe_rtt_ms_mean",
+            ]
+        ].to_string(index=False)
+    )
 
 def main():
     parser = argparse.ArgumentParser(
@@ -401,7 +557,7 @@ def main():
         name="s3_retransmissions_vs_loss",
         folder=args.out,
     )
-
+    plot_s4(args.results, args.out)
     print(f"\nOutputs saved in: {args.out.resolve()}")
     print(
         "S1 non-standard sizes remain in the summary and "

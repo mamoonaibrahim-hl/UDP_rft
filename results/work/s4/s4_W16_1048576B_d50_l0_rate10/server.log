@@ -1,0 +1,7 @@
+2026-11-27 13:31:41,521 INFO listening on 127.0.0.1:64466, saving to C:\Users\Mr Laptop Point\Documents\UDP_rft\results\work\s4\s4_W16_1048576B_d50_l0_rate10\received
+2026-11-27 13:31:43,662 INFO SYN  ('127.0.0.1', 49807) tid=4af468a3 name=src_1048576.bin size=1048576 chunks=1024
+2026-11-27 13:31:51,406 INFO FIN  ('127.0.0.1', 49807) tid=4af468a3 status=0 dup=0 ooo=0
+2026-11-27 13:31:51,778 INFO SYN  ('127.0.0.1', 50990) tid=63659da8 name=src_1048576.bin size=1048576 chunks=1024
+2026-11-27 13:31:59,540 INFO FIN  ('127.0.0.1', 50990) tid=63659da8 status=0 dup=0 ooo=0
+2026-11-27 13:31:59,874 INFO SYN  ('127.0.0.1', 62571) tid=9bee037f name=src_1048576.bin size=1048576 chunks=1024
+2026-11-27 13:32:07,648 INFO FIN  ('127.0.0.1', 62571) tid=9bee037f status=0 dup=0 ooo=0
